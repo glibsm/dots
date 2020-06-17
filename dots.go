@@ -27,6 +27,7 @@ const (
 type writeOpts struct {
 	width  int
 	writer io.Writer
+	invert bool
 }
 
 // Option ...
@@ -48,12 +49,22 @@ func Width(w int) Option {
 	}
 }
 
+// Invert the image. Braille will become the background, and empty space will
+// be used as a drawing mechanism.
+func Invert() Option {
+	return func(opts *writeOpts) error {
+		opts.invert = true
+		return nil
+	}
+}
+
 // Write the image using Unicode braille characters.
 func Write(source image.Image, options ...Option) error {
 	// default options if none are passed in
 	opts := &writeOpts{
 		width:  100,
 		writer: os.Stdout,
+		invert: false,
 	}
 
 	// apply options over the defaults
@@ -69,11 +80,20 @@ func Write(source image.Image, options ...Option) error {
 	points := [8]bool{}
 
 	calc := func(x, y int) bool {
+		var res bool
+
 		r, g, b, alpha := img.At(x, y).RGBA()
 		if r > wc && g > wc && b > wc {
-			return false
+			res = false
+		} else {
+			res = alpha >= halpha
 		}
-		return alpha >= halpha
+
+		if opts.invert {
+			return !res
+		}
+
+		return res
 	}
 
 	for y := 0; y < max.Y; y += 4 {
